@@ -13,15 +13,13 @@ On each `check(key, cost=1)` call:
 4. Otherwise, leave `tokens` unchanged and return `(allowed=False, remaining)`.
 5. Persist `tokens` and `ts = now`.
 
-## Why an atomic script
+## Implementation notes
 
-Steps 1–5 must run without interleaving from other clients against
-the same key. If two clients each independently `GET` + recompute +
-`SET`, both can see the same starting state and each decrement, but
-only the last `SET` wins — effectively allowing one of them through
-even though combined cost exceeds available tokens. Putting the whole
-sequence in a Lua script run via `EVAL`/`EVALSHA` makes it execute
-as a single Redis command, removing the interleaving window.
-
-This is the only reason the implementation uses Lua rather than a
-plain sequence of Python-side Redis calls.
+The current implementation uses a small Lua script (`bucket.lua`) sent
+via `EVAL` / `EVALSHA`. This is primarily a packaging convenience —
+keeping the bucket math on the Redis side avoids round-tripping the
+math through the Python client. Under a single Redis instance with a
+single client connection, an equivalent Python-side implementation
+using pipelined GET / SET is also correct and slightly faster; the Lua
+form is preferred only because it bundles the math into one shippable
+artifact.
